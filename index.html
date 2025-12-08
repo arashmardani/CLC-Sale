@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>خرید CLC - کلای تنبل</title>
+    <script src="https://cdn.jsdelivr.net/npm/web3@1.8.0/dist/web3.min.js"></script>
+    <script src="https://unpkg.com/@tronweb3/tronweb@latest/dist/TronWeb.js"></script>
+    <style>
+        body {
+            font-family: Tahoma, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            text-align: center;
+            padding: 50px;
+            min-height: 100vh;
+            margin: 0;
+        }
+        .container {
+            max-width: 520px;
+            margin: 0 auto;
+            background: rgba(0,0,0,0.35);
+            padding: 50px 30px;
+            border-radius: 24px;
+            backdrop-filter: blur(15px);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.4);
+        }
+        h1 {
+            font-size: 2.8em;
+            margin-bottom: 10px;
+            text-shadow: 0 2px 10px rgba(0,0,0,0.3);
+        }
+        .price {
+            font-size: 2em;
+            background: rgba(255,255,255,0.2);
+            padding: 15px;
+            border-radius: 15px;
+            margin: 25px 0;
+        }
+        button {
+            padding: 16px 50px;
+            font-size: 1.4em;
+            font-weight: bold;
+            background: #ff6b6b;
+            border: none;
+            border-radius: 50px;
+            color: white;
+            cursor: pointer;
+            margin: 12px;
+            transition: all 0.3s ease;
+            box-shadow: 0 5px 15px rgba(255,107,107,0.4);
+        }
+        button:hover {
+            background: #ff5252;
+            transform: translateY(-3px) scale(1.05);
+            box-shadow: 0 10px 25px rgba(255,82,82,0.5);
+        }
+        button:disabled {
+            background: #666;
+            cursor: not-allowed;
+            transform: none;
+        }
+        .wallet {
+            margin: 30px 0;
+            padding: 15px;
+            background: rgba(0,0,0,0.3);
+            border-radius: 12px;
+            font-size: 1.1em;
+        }
+        .connected { color: #51ff51; font-weight: bold; }
+        .loading { color: #ffeb3b; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>کلای تنبل (CLC)</h1>
+    <p>اولین میم‌کوین تنبل ایران</p>
+    
+    <div class="price">فقط ۱۰ دلار</div>
+    
+    <div class="wallet" id="walletStatus">
+        کیف پول متصل نیست
+    </div>
+
+    <button onclick="connectWallet()">اتصال کیف پول</button>
+    <button onclick="buyCLC()" id="buyBtn" disabled>خرید CLC - پرداخت ۱۰ USDT</button>
+
+    <p style="margin-top: 40px; font-size: 0.95em; opacity: 0.9;">
+        پس از پرداخت موفق، توکن CLC به صورت خودکار به کیف پول شما ارسال می‌شود
+    </p>
+</div>
+
+<script>
+    let userAddress = null;
+    let web3 = null;
+
+    async function connectWallet() {
+        document.getElementById('walletStatus').innerHTML = '<span class="loading">در حال اتصال...</span>';
+
+        // 1. اول متامسک / شبکه اتریوم و BSC
+        if (window.ethereum) {
+            try {
+                web3 = new Web3(window.ethereum);
+                await window.ethereum.request({ method: 'eth_requestAccounts' });
+                const accounts = await web3.eth.getAccounts();
+                userAddress = accounts[0];
+
+                document.getElementById('walletStatus').innerHTML = 
+                    `<span class="connected">متصل شد (اتریوم/BSC):<br>${userAddress.slice(0,8)}...${userAddress.slice(-6)}</span>`;
+                document.getElementById('buyBtn').disabled = false;
+                alert('کیف پول با موفقیت متصل شد!');
+            } catch (err) {
+                document.getElementById('walletStatus').innerHTML = 'اتصال لغو شد';
+                console.error(err);
+            }
+        }
+        // 2. ترون (تراست ولت موبایل)
+        else if (window.tronWeb && window.tronWeb.ready) {
+            userAddress = window.tronWeb.defaultAddress.base58;
+            document.getElementById('walletStatus').innerHTML = 
+                `<span class="connected">متصل شد (ترون):<br>${userAddress.slice(0,8)}...${userAddress.slice(-6)}</span>`;
+            document.getElementById('buyBtn').disabled = false;
+            alert('کیف پول ترون متصل شد!');
+        }
+        else {
+            document.getElementById('walletStatus').innerHTML = 'کیف پول شناسایی نشد';
+            alert('لطفاً متامسک یا تراست ولت نصب کنید');
+        }
+    }
+
+    async function buyCLC() {
+        if (!userAddress) return alert('اول کیف پول رو وصل کن!');
+
+        const amount = 10; // 10 USDT
+        document.getElementById('buyBtn').disabled = true;
+        document.getElementById('buyBtn').textContent = 'در حال پردازش...';
+
+        // آدرس دریافت تو (که الان مال توئه)
+        const receiverAddress = "0x9626438503c8832a65ecc931b124825c417e467e";
+
+        // شبکه ترون (TRC20)
+        if (window.tronWeb) {
+            try {
+                const usdtContractAddress = "TR7NHqjeKQxGTCuuP8qACi7c5LnM5cFCCC"; // USDT TRC20
+                const contract = await window.tronWeb.contract().at(usdtContractAddress);
+                
+                const result = await contract.transfer(
+                    receiverAddress,                    // آدرس تو
+                    amount * 1000000                     // 10 USDT = 10_000_000 (6 اعشار)
+                ).send({
+                    feeLimit: 10000000
+                });
+
+                alert('پرداخت موفق! ۱۰ USDT دریافت شد\nCLC به زودی به کیف پولت ارسال می‌شه');
+                console.log("تراکنش ترون:", result);
+                
+                // اینجا می‌تونی وب‌هوک بزنی یا لاگ کنی
+                logPurchase(userAddress, amount, "TRON", result);
+
+            } catch (err) {
+                alert('پرداخت ناموفق بود. دوباره تلاش کنید');
+                console.error(err);
+            }
+        }
+        // شبکه اتریوم / BSC (BEP20 USDT)
+        else if (web3) {
+            try {
+                const usdtAddress = "0xdAC17F958D2ee523a2206206994597C13D831ec7"; // USDT Mainnet (برای BSC عوض می‌شه)
+                const usdtABI = [{"inputs":[{"internalType":"address","name":"to","type":"address"},{"internalType":"uint256","name":"amount","type":"uint256"}],"name":"transfer","outputs":[{"internalType":"bool","name":"","type":"bool"}],"stateMutability":"nonpayable","type":"function"}];
+
+                const contract = new web3.eth.Contract(usdtABI, usdtAddress);
+                const amountWei = web3.utils.toWei(amount.toString(), "mwei"); // 6 decimals
+
+                await contract.methods.transfer(receiverAddress, amountWei).send({
+                    from: userAddress
+                });
+
+                alert('پرداخت موفق! ۱۰ USDT دریافت شد\nCLC به زودی ارسال می‌شه');
+                logPurchase(userAddress, amount, "ETH/BSC", "success");
+
+            } catch (err) {
+                alert('پرداخت ناموفق: ' + (err.message || "خطا"));
+                console.error(err);
+            }
+        }
+
+        document.getElementById('buyBtn').disabled = false;
+        document.getElementById('buyBtn').textContent = 'خرید CLC - پرداخت ۱۰ USDT';
+    }
+
+    // لاگ خرید (بعداً به گوگل شیت یا دیتابیس وصل می‌کنیم)
+    function logPurchase(address, amount, network, tx) {
+        console.log("خرید جدید:", { address, amount, network, tx, time: new Date() });
+        // اینجا می‌تونی با fetch به یه وب‌هوک تلگرام یا گوگل شیت بفرستی
+    }
+</script>
+
+</body>
+</html>
